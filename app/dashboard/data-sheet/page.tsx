@@ -1,3 +1,4 @@
+```tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -18,7 +19,6 @@ const TIMES = ["11:30", "16:00"];
 export default function DataSheetPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -33,7 +33,6 @@ export default function DataSheetPage() {
   async function loadReports() {
     try {
       setLoading(true);
-
       const response = await fetch(
         "/api/data-sheet?campaign=U25",
         {
@@ -247,7 +246,7 @@ export default function DataSheetPage() {
             </button>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {reports.map((report) => {
               const kpi = calculateKpi(report);
 
@@ -257,15 +256,15 @@ export default function DataSheetPage() {
                   className="overflow-hidden rounded-lg border border-border bg-surface"
                 >
                   {/* Date */}
-                  <div className="border-b border-border px-4 py-3">
+                  <div className="border-b border-border px-3 py-2">
                     <p className="font-mono text-xs text-text-muted">
                       {formatDate(report.date)}
                     </p>
                   </div>
 
                   {/* Time Bar */}
-                  <div className="border-b border-border bg-surface-2 px-4 py-2.5">
-                    <div className="flex items-center gap-3">
+                  <div className="border-b border-border bg-surface-2 px-3 py-2">
+                    <div className="flex items-center gap-2">
                       <span className="font-mono text-xs font-semibold">
                         {report.time}
                       </span>
@@ -275,11 +274,11 @@ export default function DataSheetPage() {
                   </div>
 
                   {/* U25 */}
-                  <div className="p-4">
-                    <div className="mx-auto w-full max-w-sm overflow-hidden rounded-md border border-border">
+                  <div className="p-2">
+                    <div className="mx-auto w-full overflow-hidden rounded-md border border-border">
                       {/* U Header */}
-                      <div className="border-b border-border bg-surface-2 px-4 py-3 text-center">
-                        <span className="font-display text-sm font-semibold">
+                      <div className="border-b border-border bg-surface-2 px-3 py-2 text-center">
+                        <span className="font-display text-xs font-semibold">
                           U25
                         </span>
                       </div>
@@ -519,7 +518,7 @@ function KpiRow({
   value: string;
 }) {
   return (
-    <div className="grid grid-cols-2 items-center px-4 py-2.5 text-xs">
+    <div className="grid grid-cols-2 items-center px-3 py-2 text-xs">
       <span className="text-text-muted">
         {label}
       </span>
@@ -564,3 +563,4 @@ function formatDate(dateString: string) {
     day: "2-digit",
   });
 }
+```
