@@ -3,13 +3,14 @@ import { supabase } from "@/lib/supabase";
 
 const TIMES = ["11:30", "16:00"];
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { data, error } = await supabase
+    const { searchParams } = new URL(request.url);
+    const campaign = searchParams.get("campaign");
+
+    let query = supabase
       .from("campaign")
-      .select(
-        "id,date,time,campaign,gmv,spend,orders"
-      )
+      .select("id,date,time,campaign,gmv,spend,orders")
       .order("date", {
         ascending: false,
       })
@@ -17,11 +18,15 @@ export async function GET() {
         ascending: false,
       });
 
+    // FIX: เดิม GET ไม่สนใจ query string เลย ดึงมาทุกแคมเปญปนกัน
+    if (campaign) {
+      query = query.eq("campaign", campaign);
+    }
+
+    const { data, error } = await query;
+
     if (error) {
-      console.error(
-        "Supabase GET error:",
-        error
-      );
+      console.error("Supabase GET error:", error);
 
       return NextResponse.json(
         {

@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Topbar from "@/components/Topbar";
 
+type ReportType = "gmv" | "live";
+
 type Report = {
   id: number;
   date: string;
@@ -15,26 +17,45 @@ type Report = {
 
 const TIMES = ["11:30", "16:00"];
 
+const GMV_ACCOUNTS = ["U4", "U7", "U23", "U21", "U3", "U18", "U25"];
+const LIVE_ACCOUNTS = ["U4", "U7", "Hang Plus168", "U21", "U3", "U18", "U25"];
+
+// ประกอบค่า campaign ที่จะส่งให้ตรงกับที่ Apps Script คาดหวัง
+// - gmv        -> "U25"          (match กับ header "U25 GMV")
+// - live       -> "live U25"     (match กับ header "live สด U25")
+// - Hang Plus168 ไม่มีคำว่า live/gmv นำหน้าเลย ส่งตรงตัว
+function buildCampaignValue(reportType: ReportType, account: string) {
+  if (reportType === "live" && account !== "Hang Plus168") {
+    return `live ${account}`;
+  }
+  return account;
+}
+
 export default function DataSheetPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [reportType, setReportType] = useState<ReportType>("gmv");
+  const [account, setAccount] = useState("U25");
+
   const [date, setDate] = useState("");
   const [time, setTime] = useState("11:30");
-  const [campaign] = useState("U25");
 
   const [spend, setSpend] = useState("");
   const [gmv, setGmv] = useState("");
   const [orders, setOrders] = useState("");
 
-  async function loadReports() {
+  const accountOptions = reportType === "gmv" ? GMV_ACCOUNTS : LIVE_ACCOUNTS;
+  const campaignValue = buildCampaignValue(reportType, account);
+
+  async function loadReports(forCampaign: string) {
     try {
       setLoading(true);
 
       const response = await fetch(
-        "/api/data-sheet?campaign=U25",
+        `/api/data-sheet?campaign=${encodeURIComponent(forCampaign)}`,
         {
           method: "GET",
           cache: "no-store",
@@ -56,8 +77,20 @@ export default function DataSheetPage() {
   }
 
   useEffect(() => {
-    loadReports();
-  }, []);
+    loadReports(campaignValue);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaignValue]);
+
+  // เปลี่ยนประเภทรายงานแล้ว ถ้าบัญชีปัจจุบันไม่มีในลิสต์ใหม่ (เช่น สลับไป live
+  // แล้วบัญชีเดิมคือ U23 ซึ่งฝั่ง live ไม่มี ใช้ "Hang Plus168" แทน) ให้รีเซ็ตเป็นตัวแรก
+  useEffect(() => {
+    const options = reportType === "gmv" ? GMV_ACCOUNTS : LIVE_ACCOUNTS;
+
+    if (!options.includes(account)) {
+      setAccount(options[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportType]);
 
   function resetForm() {
     setDate("");
@@ -117,7 +150,7 @@ export default function DataSheetPage() {
         body: JSON.stringify({
           date,
           time,
-          campaign,
+          campaign: campaignValue,
           spend: spendValue,
           gmv: gmvValue,
           orders: ordersValue,
@@ -127,9 +160,7 @@ export default function DataSheetPage() {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(
-          result.error || "บันทึกข้อมูลไม่สำเร็จ"
-        );
+        throw new Error(result.error || "บันทึกข้อมูลไม่สำเร็จ");
       }
 
       alert("บันทึกสำเร็จ และส่งข้อมูลเข้า Google Sheets แล้ว");
@@ -137,24 +168,17 @@ export default function DataSheetPage() {
       resetForm();
       setShowAdd(false);
 
-      await loadReports();
+      await loadReports(campaignValue);
     } catch (error) {
       console.error(error);
 
-      alert(
-        error instanceof Error
-          ? error.message
-          : "เกิดข้อผิดพลาด"
-      );
+      alert(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
     } finally {
       setSaving(false);
     }
   }
 
-  function formatNumber(
-    value: number | null | undefined,
-    digits = 2
-  ) {
+  function formatNumber(value: number | null | undefined, digits = 2) {
     if (value === null || value === undefined) {
       return "—";
     }
@@ -170,32 +194,12 @@ export default function DataSheetPage() {
     const gmvValue = Number(report.gmv ?? 0);
     const ordersValue = Number(report.orders ?? 0);
 
-    const cpa =
-      ordersValue > 0
-        ? spendValue / ordersValue
-        : 0;
+    const cpa = ordersValue > 0 ? spendValue / ordersValue : 0;
+    const adsPercent = gmvValue > 0 ? (spendValue / gmvValue) * 100 : 0;
+    const roas = spendValue > 0 ? gmvValue / spendValue : 0;
+    const averageBill = ordersValue > 0 ? gmvValue / ordersValue : 0;
 
-    const adsPercent =
-      gmvValue > 0
-        ? (spendValue / gmvValue) * 100
-        : 0;
-
-    const roas =
-      spendValue > 0
-        ? gmvValue / spendValue
-        : 0;
-
-    const averageBill =
-      ordersValue > 0
-        ? gmvValue / ordersValue
-        : 0;
-
-    return {
-      cpa,
-      adsPercent,
-      roas,
-      averageBill,
-    };
+    return { cpa, adsPercent, roas, averageBill };
   }
 
   return (
@@ -203,37 +207,58 @@ export default function DataSheetPage() {
       <Topbar title="Data Sheet" />
 
       <main className="flex-1 p-4 md:p-6">
-        <div className="mb-5 flex items-center justify-between">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-display text-base font-semibold">
               Campaign Reports
             </h2>
 
             <p className="mt-1 text-xs text-text-muted">
-              U25 GMV
+              {reportType === "gmv" ? `${account} GMV` : `live สด ${account}`}
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowAdd(true)}
-            className="rounded-md bg-text px-3 py-2 text-xs font-medium text-bg transition-opacity hover:opacity-80"
-          >
-            + Add
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={reportType}
+              onChange={(event) =>
+                setReportType(event.target.value as ReportType)
+              }
+              className="rounded-md border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-text outline-none focus:border-text-muted"
+            >
+              <option value="gmv">GMV</option>
+              <option value="live">live สด</option>
+            </select>
+
+            <select
+              value={account}
+              onChange={(event) => setAccount(event.target.value)}
+              className="rounded-md border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-text outline-none focus:border-text-muted"
+            >
+              {accountOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              onClick={() => setShowAdd(true)}
+              className="rounded-md bg-text px-3 py-2 text-xs font-medium text-bg transition-opacity hover:opacity-80"
+            >
+              + Add
+            </button>
+          </div>
         </div>
 
         {loading ? (
           <div className="rounded-lg border border-border bg-surface p-8 text-center">
-            <p className="text-sm text-text-muted">
-              กำลังโหลดข้อมูล...
-            </p>
+            <p className="text-sm text-text-muted">กำลังโหลดข้อมูล...</p>
           </div>
         ) : reports.length === 0 ? (
           <div className="rounded-lg border border-border bg-surface p-10 text-center">
-            <p className="text-sm text-text-muted">
-              ยังไม่มีรายงาน
-            </p>
+            <p className="text-sm text-text-muted">ยังไม่มีรายงาน</p>
 
             <button
               type="button"
@@ -273,7 +298,7 @@ export default function DataSheetPage() {
                     <div className="mx-auto w-full overflow-hidden rounded-md border border-border">
                       <div className="border-b border-border bg-surface-2 px-2 py-1.5 text-center">
                         <span className="font-display text-xs font-semibold">
-                          U25
+                          {report.campaign}
                         </span>
                       </div>
 
@@ -283,10 +308,7 @@ export default function DataSheetPage() {
                           value={formatNumber(report.spend)}
                         />
 
-                        <KpiRow
-                          label="CPA"
-                          value={formatNumber(kpi.cpa)}
-                        />
+                        <KpiRow label="CPA" value={formatNumber(kpi.cpa)} />
 
                         <KpiRow
                           label="ยอดขาย"
@@ -327,12 +349,12 @@ export default function DataSheetPage() {
           <div className="w-full max-w-md rounded-lg border border-border bg-surface p-5 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <h3 className="font-display font-semibold">
-                  Add Report
-                </h3>
+                <h3 className="font-display font-semibold">Add Report</h3>
 
                 <p className="mt-1 text-xs text-text-muted">
-                  U25 GMV
+                  {reportType === "gmv"
+                    ? `${account} GMV`
+                    : `live สด ${account}`}
                 </p>
               </div>
 
@@ -353,9 +375,7 @@ export default function DataSheetPage() {
                 <input
                   type="date"
                   value={date}
-                  onChange={(event) =>
-                    setDate(event.target.value)
-                  }
+                  onChange={(event) => setDate(event.target.value)}
                   className="w-full rounded-md border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-text outline-none focus:border-text-muted"
                 />
               </Field>
@@ -363,31 +383,41 @@ export default function DataSheetPage() {
               <Field label="เวลา">
                 <select
                   value={time}
-                  onChange={(event) =>
-                    setTime(event.target.value)
-                  }
+                  onChange={(event) => setTime(event.target.value)}
                   className="w-full rounded-md border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-text outline-none focus:border-text-muted"
                 >
                   {TIMES.map((item) => (
-                    <option
-                      key={item}
-                      value={item}
-                    >
+                    <option key={item} value={item}>
                       {item}
                     </option>
                   ))}
                 </select>
               </Field>
 
-              <Field label="U">
+              <Field label="ประเภทรายงาน">
                 <select
-                  value={campaign}
-                  disabled
-                  className="w-full cursor-not-allowed rounded-md border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-text opacity-70 outline-none"
+                  value={reportType}
+                  onChange={(event) =>
+                    setReportType(event.target.value as ReportType)
+                  }
+                  className="w-full rounded-md border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-text outline-none focus:border-text-muted"
                 >
-                  <option value="U25">
-                    U25
-                  </option>
+                  <option value="gmv">GMV</option>
+                  <option value="live">live สด</option>
+                </select>
+              </Field>
+
+              <Field label="บัญชี">
+                <select
+                  value={account}
+                  onChange={(event) => setAccount(event.target.value)}
+                  className="w-full rounded-md border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-text outline-none focus:border-text-muted"
+                >
+                  {accountOptions.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
                 </select>
               </Field>
 
@@ -398,9 +428,7 @@ export default function DataSheetPage() {
                   step="0.01"
                   min="0"
                   value={spend}
-                  onChange={(event) =>
-                    setSpend(event.target.value)
-                  }
+                  onChange={(event) => setSpend(event.target.value)}
                   placeholder="0.00"
                   className="w-full rounded-md border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-text outline-none focus:border-text-muted"
                 />
@@ -413,9 +441,7 @@ export default function DataSheetPage() {
                   step="0.01"
                   min="0"
                   value={gmv}
-                  onChange={(event) =>
-                    setGmv(event.target.value)
-                  }
+                  onChange={(event) => setGmv(event.target.value)}
                   placeholder="0.00"
                   className="w-full rounded-md border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-text outline-none focus:border-text-muted"
                 />
@@ -428,9 +454,7 @@ export default function DataSheetPage() {
                   step="1"
                   min="0"
                   value={orders}
-                  onChange={(event) =>
-                    setOrders(event.target.value)
-                  }
+                  onChange={(event) => setOrders(event.target.value)}
                   placeholder="0"
                   className="w-full rounded-md border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-text outline-none focus:border-text-muted"
                 />
@@ -466,22 +490,12 @@ export default function DataSheetPage() {
   );
 }
 
-function KpiRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function KpiRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-2 items-center px-2 py-1.5 text-xs">
-      <span className="text-text-muted">
-        {label}
-      </span>
+      <span className="text-text-muted">{label}</span>
 
-      <span className="text-right font-mono font-medium">
-        {value}
-      </span>
+      <span className="text-right font-mono font-medium">{value}</span>
     </div>
   );
 }
@@ -495,9 +509,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs text-text-muted">
-        {label}
-      </span>
+      <span className="mb-1.5 block text-xs text-text-muted">{label}</span>
 
       {children}
     </label>
