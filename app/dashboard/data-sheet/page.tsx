@@ -1,4 +1,3 @@
-```tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -204,7 +203,6 @@ export default function DataSheetPage() {
       <Topbar title="Data Sheet" />
 
       <main className="flex-1 p-4 md:p-6">
-        {/* Page Header */}
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="font-display text-base font-semibold">
@@ -225,7 +223,6 @@ export default function DataSheetPage() {
           </button>
         </div>
 
-        {/* Reports */}
         {loading ? (
           <div className="rounded-lg border border-border bg-surface p-8 text-center">
             <p className="text-sm text-text-muted">
@@ -256,14 +253,12 @@ export default function DataSheetPage() {
                   key={report.id}
                   className="overflow-hidden rounded-lg border border-border bg-surface"
                 >
-                  {/* Date */}
                   <div className="border-b border-border px-3 py-2">
                     <p className="font-mono text-xs text-text-muted">
                       {formatDate(report.date)}
                     </p>
                   </div>
 
-                  {/* Time Bar */}
                   <div className="border-b border-border bg-surface-2 px-3 py-2">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs font-semibold">
@@ -274,17 +269,14 @@ export default function DataSheetPage() {
                     </div>
                   </div>
 
-                  {/* U25 */}
                   <div className="p-2">
                     <div className="mx-auto w-full overflow-hidden rounded-md border border-border">
-                      {/* U Header */}
                       <div className="border-b border-border bg-surface-2 px-2 py-1.5 text-center">
                         <span className="font-display text-xs font-semibold">
                           U25
                         </span>
                       </div>
 
-                      {/* KPI */}
                       <div className="divide-y divide-border">
                         <KpiRow
                           label="งบที่ใช้ไป"
@@ -303,7 +295,7 @@ export default function DataSheetPage() {
 
                         <KpiRow
                           label="%ads"
-                          value={`${kpi.adsPercent.toFixed(2)}%`}
+                          value={kpi.adsPercent.toFixed(2) + "%"}
                         />
 
                         <KpiRow
@@ -330,11 +322,9 @@ export default function DataSheetPage() {
         )}
       </main>
 
-      {/* Add Modal */}
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-lg border border-border bg-surface p-5 shadow-xl">
-            {/* Modal Header */}
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <h3 className="font-display font-semibold">
@@ -359,7 +349,6 @@ export default function DataSheetPage() {
             </div>
 
             <div className="space-y-4">
-              {/* Date */}
               <Field label="วันที่">
                 <input
                   type="date"
@@ -367,18 +356,17 @@ export default function DataSheetPage() {
                   onChange={(event) =>
                     setDate(event.target.value)
                   }
-                  className="input"
+                  className="w-full rounded-md border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-text outline-none focus:border-text-muted"
                 />
               </Field>
 
-              {/* Time */}
               <Field label="เวลา">
                 <select
                   value={time}
                   onChange={(event) =>
                     setTime(event.target.value)
                   }
-                  className="input"
+                  className="w-full rounded-md border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-text outline-none focus:border-text-muted"
                 >
                   {TIMES.map((item) => (
                     <option
@@ -391,12 +379,11 @@ export default function DataSheetPage() {
                 </select>
               </Field>
 
-              {/* U */}
               <Field label="U">
                 <select
                   value={campaign}
                   disabled
-                  className="input cursor-not-allowed opacity-70"
+                  className="w-full cursor-not-allowed rounded-md border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-text opacity-70 outline-none"
                 >
                   <option value="U25">
                     U25
@@ -404,7 +391,6 @@ export default function DataSheetPage() {
                 </select>
               </Field>
 
-              {/* Spend */}
               <Field label="งบที่ใช้ไป">
                 <input
                   type="number"
@@ -416,11 +402,10 @@ export default function DataSheetPage() {
                     setSpend(event.target.value)
                   }
                   placeholder="0.00"
-                  className="input"
+                  className="w-full rounded-md border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-text outline-none focus:border-text-muted"
                 />
               </Field>
 
-              {/* GMV */}
               <Field label="ยอดขาย">
                 <input
                   type="number"
@@ -432,11 +417,10 @@ export default function DataSheetPage() {
                     setGmv(event.target.value)
                   }
                   placeholder="0.00"
-                  className="input"
+                  className="w-full rounded-md border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-text outline-none focus:border-text-muted"
                 />
               </Field>
 
-              {/* Orders */}
               <Field label="order">
                 <input
                   type="number"
@@ -448,12 +432,11 @@ export default function DataSheetPage() {
                     setOrders(event.target.value)
                   }
                   placeholder="0"
-                  className="input"
+                  className="w-full rounded-md border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-text outline-none focus:border-text-muted"
                 />
               </Field>
             </div>
 
-            {/* Modal Footer */}
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
@@ -473,35 +456,12 @@ export default function DataSheetPage() {
                 disabled={saving}
                 className="rounded-md bg-text px-4 py-2 text-xs font-medium text-bg disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {saving
-                  ? "กำลังบันทึก..."
-                  : "บันทึก"}
+                {saving ? "กำลังบันทึก..." : "บันทึก"}
               </button>
             </div>
           </div>
         </div>
       )}
-
-      <style jsx>{`
-        .input {
-          width: 100%;
-          border: 1px solid var(--border);
-          background: var(--surface-2);
-          color: var(--text);
-          border-radius: 6px;
-          padding: 9px 10px;
-          font-size: 13px;
-          outline: none;
-        }
-
-        .input:focus {
-          border-color: var(--text-muted);
-        }
-
-        .input:disabled {
-          opacity: 0.7;
-        }
-      `}</style>
     </div>
   );
 }
@@ -547,7 +507,7 @@ function Field({
 function formatDate(dateString: string) {
   if (!dateString) return "—";
 
-  const date = new Date(`${dateString}T00:00:00`);
+  const date = new Date(dateString + "T00:00:00");
 
   if (Number.isNaN(date.getTime())) {
     return dateString;
@@ -559,4 +519,3 @@ function formatDate(dateString: string) {
     day: "2-digit",
   });
 }
-```
