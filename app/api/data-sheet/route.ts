@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
-const CAMPAIGNS = [
-  "U25 COCOLLY",
-  "LIVE 25 COCOLLY",
-];
-
 const TIMES = ["11:30", "16:00"];
 
 export async function GET() {
@@ -15,7 +10,6 @@ export async function GET() {
       .select(
         "id,date,time,campaign,gmv,spend,orders"
       )
-      .in("campaign", CAMPAIGNS)
       .order("date", {
         ascending: false,
       })
@@ -71,6 +65,9 @@ export async function POST(request: Request) {
       orders,
     } = body;
 
+    // -----------------------------
+    // Validate date
+    // -----------------------------
     if (!date) {
       return NextResponse.json(
         {
@@ -81,6 +78,9 @@ export async function POST(request: Request) {
       );
     }
 
+    // -----------------------------
+    // Validate time
+    // -----------------------------
     if (!TIMES.includes(time)) {
       return NextResponse.json(
         {
@@ -92,16 +92,27 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!CAMPAIGNS.includes(campaign)) {
+    // -----------------------------
+    // Validate campaign
+    // -----------------------------
+    if (
+      typeof campaign !== "string" ||
+      !campaign.trim()
+    ) {
       return NextResponse.json(
         {
           success: false,
-          error: "Campaign ไม่ถูกต้อง",
+          error: "กรุณาเลือก Campaign",
         },
         { status: 400 }
       );
     }
 
+    const campaignValue = campaign.trim();
+
+    // -----------------------------
+    // Convert numbers
+    // -----------------------------
     const spendValue = Number(spend);
     const gmvValue = Number(gmv);
     const ordersValue = Number(orders);
@@ -120,6 +131,9 @@ export async function POST(request: Request) {
       );
     }
 
+    // -----------------------------
+    // Prevent negative values
+    // -----------------------------
     if (
       spendValue < 0 ||
       gmvValue < 0 ||
@@ -134,6 +148,9 @@ export async function POST(request: Request) {
       );
     }
 
+    // -----------------------------
+    // Orders must be greater than 0
+    // -----------------------------
     if (ordersValue <= 0) {
       return NextResponse.json(
         {
@@ -144,13 +161,19 @@ export async function POST(request: Request) {
       );
     }
 
+    // -----------------------------
+    // Insert Supabase
+    // -----------------------------
     const { data, error } = await supabase
       .from("campaign")
       .insert({
         date,
         time,
-        campaign,
+        campaign: campaignValue,
+
+        // Product ไม่ใช้งานแล้ว
         product: null,
+
         gmv: gmvValue,
         spend: spendValue,
         orders: ordersValue,
@@ -173,8 +196,14 @@ export async function POST(request: Request) {
       );
     }
 
+    // -----------------------------
+    // Calculate KPI
+    // -----------------------------
+
     const cpa =
-      spendValue / ordersValue;
+      ordersValue > 0
+        ? spendValue / ordersValue
+        : 0;
 
     const adsPercent =
       gmvValue > 0
@@ -187,7 +216,13 @@ export async function POST(request: Request) {
         : 0;
 
     const averageBill =
-      gmvValue / ordersValue;
+      ordersValue > 0
+        ? gmvValue / ordersValue
+        : 0;
+
+    // -----------------------------
+    // Google Sheets Auto Sync
+    // -----------------------------
 
     const googleSheetsUrl =
       process.env.GOOGLE_SHEETS_WEBHOOK_URL;
@@ -199,21 +234,34 @@ export async function POST(request: Request) {
         const googleResponse =
           await fetch(googleSheetsUrl, {
             method: "POST",
+
             headers: {
               "Content-Type":
                 "application/json",
             },
+
             body: JSON.stringify({
               id: data.id,
+
               date: data.date,
+
               time: data.time,
-              campaign: data.campaign,
+
+              campaign:
+                data.campaign,
+
               spend: spendValue,
+
               cpa,
+
               gmv: gmvValue,
+
               adsPercent,
+
               roas,
+
               orders: ordersValue,
+
               averageBill,
             }),
           });
@@ -228,6 +276,7 @@ export async function POST(request: Request) {
           googleSheets = {
             success:
               googleResponse.ok,
+
             response: text,
           };
         }
@@ -239,32 +288,50 @@ export async function POST(request: Request) {
 
         googleSheets = {
           success: false,
+
           error:
             "ส่ง Google Sheets ไม่สำเร็จ",
         };
       }
     }
 
+    // -----------------------------
+    // Response
+    // -----------------------------
+
     return NextResponse.json({
       success: true,
+
       data,
+
       kpi: {
         spend: spendValue,
+
         cpa,
+
         gmv: gmvValue,
+
         adsPercent,
+
         roas,
+
         orders: ordersValue,
+
         averageBill,
       },
+
       googleSheets,
     });
   } catch (error) {
-    console.error("POST error:", error);
+    console.error(
+      "POST error:",
+      error
+    );
 
     return NextResponse.json(
       {
         success: false,
+
         error:
           error instanceof Error
             ? error.message
