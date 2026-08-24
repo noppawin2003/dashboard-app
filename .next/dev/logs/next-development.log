@@ -1,0 +1,8 @@
+{"timestamp":"00:00:23.971","source":"Server","level":"LOG","message":""}
+{"timestamp":"00:00:23.975","source":"Server","level":"ERROR","message":"Watchpack Error (initial scan): Error: EINVAL: invalid argument, lstat 'C:\\DumpStack.log.tmp'"}
+{"timestamp":"00:00:23.975","source":"Server","level":"ERROR","message":"Watchpack Error (initial scan): Error: EINVAL: invalid argument, lstat 'C:\\PageFile.sys'"}
+{"timestamp":"00:00:23.976","source":"Server","level":"ERROR","message":"Watchpack Error (initial scan): Error: EINVAL: invalid argument, lstat 'C:\\swapfile.sys'"}
+{"timestamp":"00:00:23.976","source":"Server","level":"ERROR","message":"Watchpack Error (initial scan): Error: EINVAL: invalid argument, lstat 'C:\\hiberfil.sys'"}
+{"timestamp":"00:03:41.342","source":"Server","level":"LOG","message":"○ Compiling / ..."}
+{"timestamp":"00:03:52.008","source":"Browser","level":"INFO","message":"Download the React DevTools for a better development experience: https://react.dev/link/react-devtools"}
+{"timestamp":"00:08:31.783","source":"Browser","level":"INFO","message":"Download the React DevTools for a better development experience: https://react.dev/link/react-devtools"}
