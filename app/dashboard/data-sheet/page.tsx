@@ -1,374 +1,542 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, RefreshCw, Trash2, Pencil } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import Topbar from "@/components/Topbar";
 
-type CampaignData = {
+type Report = {
   id: number;
-  date: string | null;
-  time: string | null;
-  campaign: string | null;
-  product: string | null;
-  gmv: number;
-  spend: number;
-  orders: number;
+  date: string;
+  time: string;
+  campaign: string;
+  gmv: number | null;
+  spend: number | null;
+  orders: number | null;
 };
 
-const emptyForm = {
-  date: "",
-  time: "",
-  campaign: "",
-  product: "",
-  gmv: "0",
-  spend: "0",
-  orders: "0",
-};
+const TIMES = ["11:30", "16:00"];
 
 export default function DataSheetPage() {
-  const [data, setData] = useState<CampaignData[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState(emptyForm);
 
-  async function loadData() {
-    setLoading(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-    const { data, error } = await supabase
-      .from("campaign_data")
-      .select("*")
-      .order("date", { ascending: false })
-      .order("time", { ascending: false });
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("11:30");
+  const [campaign] = useState("U25");
 
-    if (error) {
+  const [spend, setSpend] = useState("");
+  const [gmv, setGmv] = useState("");
+  const [orders, setOrders] = useState("");
+
+  async function loadReports() {
+    try {
+      setLoading(true);
+
+      const response = await fetch(
+        "/api/data-sheet?campaign=U25",
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("โหลดข้อมูลไม่สำเร็จ");
+      }
+
+      const result = await response.json();
+
+      setReports(result.data ?? []);
+    } catch (error) {
       console.error(error);
-      alert(error.message);
-    } else {
-      setData(data || []);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   useEffect(() => {
-    loadData();
+    loadReports();
   }, []);
 
-  function openAddForm() {
-    setEditingId(null);
-    setForm(emptyForm);
-    setShowForm(true);
+  function resetForm() {
+    setDate("");
+    setTime("11:30");
+    setSpend("");
+    setGmv("");
+    setOrders("");
   }
 
-  function openEditForm(row: CampaignData) {
-    setEditingId(row.id);
-
-    setForm({
-      date: row.date || "",
-      time: row.time || "",
-      campaign: row.campaign || "",
-      product: row.product || "",
-      gmv: String(row.gmv ?? 0),
-      spend: String(row.spend ?? 0),
-      orders: String(row.orders ?? 0),
-    });
-
-    setShowForm(true);
-  }
-
-  async function saveData() {
-    const payload = {
-      date: form.date || null,
-      time: form.time || null,
-      campaign: form.campaign || null,
-      product: form.product || null,
-      gmv: Number(form.gmv) || 0,
-      spend: Number(form.spend) || 0,
-      orders: Number(form.orders) || 0,
-    };
-
-    if (editingId) {
-      const { error } = await supabase
-        .from("campaign_data")
-        .update(payload)
-        .eq("id", editingId);
-
-      if (error) {
-        alert(error.message);
-        return;
-      }
-    } else {
-      const { error } = await supabase
-        .from("campaign_data")
-        .insert(payload);
-
-      if (error) {
-        alert(error.message);
-        return;
-      }
-    }
-
-    setShowForm(false);
-    setEditingId(null);
-    setForm(emptyForm);
-
-    await loadData();
-  }
-
-  async function deleteData(id: number) {
-    const confirmed = window.confirm(
-      "ต้องการลบข้อมูลรายการนี้หรือไม่?"
-    );
-
-    if (!confirmed) return;
-
-    const { error } = await supabase
-      .from("campaign_data")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      alert(error.message);
+  async function handleSave() {
+    if (!date) {
+      alert("กรุณาเลือกวันที่");
       return;
     }
 
-    await loadData();
+    if (!time) {
+      alert("กรุณาเลือกเวลา");
+      return;
+    }
+
+    if (!spend || !gmv || !orders) {
+      alert("กรุณากรอก งบที่ใช้ไป / ยอดขาย / order ให้ครบ");
+      return;
+    }
+
+    const spendValue = Number(spend);
+    const gmvValue = Number(gmv);
+    const ordersValue = Number(orders);
+
+    if (
+      !Number.isFinite(spendValue) ||
+      !Number.isFinite(gmvValue) ||
+      !Number.isFinite(ordersValue)
+    ) {
+      alert("กรุณาตรวจสอบตัวเลข");
+      return;
+    }
+
+    if (spendValue < 0 || gmvValue < 0 || ordersValue < 0) {
+      alert("ตัวเลขต้องไม่ติดลบ");
+      return;
+    }
+
+    if (ordersValue === 0) {
+      alert("order ต้องมากกว่า 0");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const response = await fetch("/api/data-sheet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          date,
+          time,
+          campaign,
+          spend: spendValue,
+          gmv: gmvValue,
+          orders: ordersValue,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.error || "บันทึกข้อมูลไม่สำเร็จ"
+        );
+      }
+
+      alert("บันทึกสำเร็จ และส่งข้อมูลเข้า Google Sheets แล้ว");
+
+      resetForm();
+      setShowAdd(false);
+
+      await loadReports();
+    } catch (error) {
+      console.error(error);
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "เกิดข้อผิดพลาด"
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function formatNumber(
+    value: number | null | undefined,
+    digits = 2
+  ) {
+    if (value === null || value === undefined) {
+      return "—";
+    }
+
+    return value.toLocaleString("en-US", {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+  }
+
+  function calculateKpi(report: Report) {
+    const spendValue = Number(report.spend ?? 0);
+    const gmvValue = Number(report.gmv ?? 0);
+    const ordersValue = Number(report.orders ?? 0);
+
+    const cpa =
+      ordersValue > 0
+        ? spendValue / ordersValue
+        : 0;
+
+    const adsPercent =
+      gmvValue > 0
+        ? (spendValue / gmvValue) * 100
+        : 0;
+
+    const roas =
+      spendValue > 0
+        ? gmvValue / spendValue
+        : 0;
+
+    const averageBill =
+      ordersValue > 0
+        ? gmvValue / ordersValue
+        : 0;
+
+    return {
+      cpa,
+      adsPercent,
+      roas,
+      averageBill,
+    };
   }
 
   return (
-    <>
+    <div className="flex min-h-screen flex-col bg-bg">
       <Topbar title="Data Sheet" />
 
-      <main className="flex-1 p-6">
-        <div className="flex items-center justify-between mb-5">
+      <main className="flex-1 p-4 md:p-6">
+        {/* Page Header */}
+        <div className="mb-5 flex items-center justify-between">
           <div>
-            <p className="text-sm text-text-muted">
-              Campaign data
-            </p>
-            <p className="mt-1 text-xs text-text-muted font-mono">
-              {data.length} records
+            <h2 className="font-display text-base font-semibold">
+              Campaign Reports
+            </h2>
+
+            <p className="mt-1 text-xs text-text-muted">
+              U25 GMV
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={loadData}
-              className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-muted hover:bg-surface-2 hover:text-text transition-colors"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </button>
-
-            <button
-              onClick={openAddForm}
-              className="flex items-center gap-2 rounded-md bg-text px-3 py-2 text-sm text-bg hover:opacity-90 transition-opacity"
-            >
-              <Plus className="h-4 w-4" />
-              Add Data
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowAdd(true)}
+            className="rounded-md bg-text px-3 py-2 text-xs font-medium text-bg transition-opacity hover:opacity-80"
+          >
+            + Add
+          </button>
         </div>
 
-        {showForm && (
-          <div className="mb-6 rounded-lg border border-border bg-surface p-5">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-display font-semibold">
-                {editingId ? "Edit Data" : "Add Data"}
-              </h2>
+        {/* Reports */}
+        {loading ? (
+          <div className="rounded-lg border border-border bg-surface p-8 text-center">
+            <p className="text-sm text-text-muted">
+              กำลังโหลดข้อมูล...
+            </p>
+          </div>
+        ) : reports.length === 0 ? (
+          <div className="rounded-lg border border-border bg-surface p-10 text-center">
+            <p className="text-sm text-text-muted">
+              ยังไม่มีรายงาน
+            </p>
 
-              <button
-                onClick={() => setShowForm(false)}
-                className="text-sm text-text-muted hover:text-text"
-              >
-                Cancel
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowAdd(true)}
+              className="mt-3 text-xs text-text underline underline-offset-4"
+            >
+              + เพิ่มรายงานแรก
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {reports.map((report) => {
+              const kpi = calculateKpi(report);
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Input
-                label="Date"
-                type="date"
-                value={form.date}
-                onChange={(value) =>
-                  setForm({ ...form, date: value })
-                }
-              />
+              return (
+                <section
+                  key={report.id}
+                  className="overflow-hidden rounded-lg border border-border bg-surface"
+                >
+                  {/* Date */}
+                  <div className="border-b border-border px-4 py-3">
+                    <p className="font-mono text-xs text-text-muted">
+                      {formatDate(report.date)}
+                    </p>
+                  </div>
 
-              <Input
-                label="Time"
-                type="time"
-                value={form.time}
-                onChange={(value) =>
-                  setForm({ ...form, time: value })
-                }
-              />
+                  {/* Time Bar */}
+                  <div className="border-b border-border bg-surface-2 px-4 py-2.5">
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-xs font-semibold">
+                        {report.time}
+                      </span>
 
-              <Input
-                label="Campaign"
-                value={form.campaign}
-                onChange={(value) =>
-                  setForm({ ...form, campaign: value })
-                }
-              />
+                      <div className="h-px flex-1 bg-border" />
+                    </div>
+                  </div>
 
-              <Input
-                label="Product"
-                value={form.product}
-                onChange={(value) =>
-                  setForm({ ...form, product: value })
-                }
-              />
+                  {/* U25 */}
+                  <div className="p-4">
+                    <div className="mx-auto w-full max-w-sm overflow-hidden rounded-md border border-border">
+                      {/* U Header */}
+                      <div className="border-b border-border bg-surface-2 px-4 py-3 text-center">
+                        <span className="font-display text-sm font-semibold">
+                          U25
+                        </span>
+                      </div>
 
-              <Input
-                label="GMV"
-                type="number"
-                value={form.gmv}
-                onChange={(value) =>
-                  setForm({ ...form, gmv: value })
-                }
-              />
+                      {/* KPI */}
+                      <div className="divide-y divide-border">
+                        <KpiRow
+                          label="งบที่ใช้ไป"
+                          value={formatNumber(report.spend)}
+                        />
 
-              <Input
-                label="Spend"
-                type="number"
-                value={form.spend}
-                onChange={(value) =>
-                  setForm({ ...form, spend: value })
-                }
-              />
+                        <KpiRow
+                          label="CPA"
+                          value={formatNumber(kpi.cpa)}
+                        />
 
-              <Input
-                label="Orders"
-                type="number"
-                value={form.orders}
-                onChange={(value) =>
-                  setForm({ ...form, orders: value })
-                }
-              />
-            </div>
+                        <KpiRow
+                          label="ยอดขาย"
+                          value={formatNumber(report.gmv, 0)}
+                        />
 
-            <div className="mt-5 flex justify-end">
-              <button
-                onClick={saveData}
-                className="rounded-md bg-text px-4 py-2 text-sm text-bg hover:opacity-90"
-              >
-                {editingId ? "Save Changes" : "Save Data"}
-              </button>
-            </div>
+                        <KpiRow
+                          label="%ads"
+                          value={`${kpi.adsPercent.toFixed(2)}%`}
+                        />
+
+                        <KpiRow
+                          label="ROAS (เท่า)"
+                          value={kpi.roas.toFixed(2)}
+                        />
+
+                        <KpiRow
+                          label="order"
+                          value={formatNumber(
+                            report.orders,
+                            0
+                          )}
+                        />
+
+                        <KpiRow
+                          label="เฉลี่ยบิล"
+                          value={formatNumber(
+                            kpi.averageBill
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              );
+            })}
           </div>
         )}
+      </main>
 
-        <div className="rounded-lg border border-border bg-surface overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-text-muted text-xs uppercase tracking-wide">
-                  <th className="px-5 py-3 font-medium">Date</th>
-                  <th className="px-5 py-3 font-medium">Time</th>
-                  <th className="px-5 py-3 font-medium">Campaign</th>
-                  <th className="px-5 py-3 font-medium">Product</th>
-                  <th className="px-5 py-3 font-medium">GMV</th>
-                  <th className="px-5 py-3 font-medium">Spend</th>
-                  <th className="px-5 py-3 font-medium">Orders</th>
-                  <th className="px-5 py-3 font-medium text-right">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
+      {/* Add Modal */}
+      {showAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg border border-border bg-surface p-5 shadow-xl">
+            {/* Modal Header */}
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h3 className="font-display font-semibold">
+                  Add Report
+                </h3>
 
-              <tbody className="divide-y divide-border">
-                {loading ? (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-5 py-10 text-center text-text-muted"
+                <p className="mt-1 text-xs text-text-muted">
+                  U25 GMV
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAdd(false);
+                  resetForm();
+                }}
+                className="text-lg leading-none text-text-muted hover:text-text"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Date */}
+              <Field label="วันที่">
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(event) =>
+                    setDate(event.target.value)
+                  }
+                  className="input"
+                />
+              </Field>
+
+              {/* Time */}
+              <Field label="เวลา">
+                <select
+                  value={time}
+                  onChange={(event) =>
+                    setTime(event.target.value)
+                  }
+                  className="input"
+                >
+                  {TIMES.map((item) => (
+                    <option
+                      key={item}
+                      value={item}
                     >
-                      Loading...
-                    </td>
-                  </tr>
-                ) : data.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-5 py-10 text-center text-text-muted"
-                    >
-                      No campaign data yet.
-                    </td>
-                  </tr>
-                ) : (
-                  data.map((row) => (
-                    <tr key={row.id}>
-                      <td className="px-5 py-4">
-                        {row.date || "—"}
-                      </td>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </Field>
 
-                      <td className="px-5 py-4 font-mono text-xs text-text-muted">
-                        {row.time || "—"}
-                      </td>
+              {/* U */}
+              <Field label="U">
+                <select
+                  value={campaign}
+                  disabled
+                  className="input cursor-not-allowed opacity-70"
+                >
+                  <option value="U25">
+                    U25
+                  </option>
+                </select>
+              </Field>
 
-                      <td className="px-5 py-4 font-medium">
-                        {row.campaign || "—"}
-                      </td>
+              {/* Spend */}
+              <Field label="งบที่ใช้ไป">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={spend}
+                  onChange={(event) =>
+                    setSpend(event.target.value)
+                  }
+                  placeholder="0.00"
+                  className="input"
+                />
+              </Field>
 
-                      <td className="px-5 py-4 text-text-muted">
-                        {row.product || "—"}
-                      </td>
+              {/* GMV */}
+              <Field label="ยอดขาย">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={gmv}
+                  onChange={(event) =>
+                    setGmv(event.target.value)
+                  }
+                  placeholder="0.00"
+                  className="input"
+                />
+              </Field>
 
-                      <td className="px-5 py-4 font-mono text-xs">
-                        {Number(row.gmv).toLocaleString()}
-                      </td>
+              {/* Orders */}
+              <Field label="order">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  step="1"
+                  min="0"
+                  value={orders}
+                  onChange={(event) =>
+                    setOrders(event.target.value)
+                  }
+                  placeholder="0"
+                  className="input"
+                />
+              </Field>
+            </div>
 
-                      <td className="px-5 py-4 font-mono text-xs">
-                        {Number(row.spend).toLocaleString()}
-                      </td>
+            {/* Modal Footer */}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAdd(false);
+                  resetForm();
+                }}
+                disabled={saving}
+                className="rounded-md border border-border px-4 py-2 text-xs text-text-muted hover:text-text disabled:opacity-50"
+              >
+                ยกเลิก
+              </button>
 
-                      <td className="px-5 py-4 font-mono text-xs">
-                        {Number(row.orders).toLocaleString()}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => openEditForm(row)}
-                            className="rounded-md p-2 text-text-muted hover:bg-surface-2 hover:text-text"
-                            title="Edit"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-
-                          <button
-                            onClick={() => deleteData(row.id)}
-                            className="rounded-md p-2 text-text-muted hover:bg-surface-2 hover:text-red-400"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="rounded-md bg-text px-4 py-2 text-xs font-medium text-bg disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving
+                  ? "กำลังบันทึก..."
+                  : "บันทึก"}
+              </button>
+            </div>
           </div>
         </div>
-      </main>
-    </>
+      )}
+
+      <style jsx>{`
+        .input {
+          width: 100%;
+          border: 1px solid var(--border);
+          background: var(--surface-2);
+          color: var(--text);
+          border-radius: 6px;
+          padding: 9px 10px;
+          font-size: 13px;
+          outline: none;
+        }
+
+        .input:focus {
+          border-color: var(--text-muted);
+        }
+
+        .input:disabled {
+          opacity: 0.7;
+        }
+      `}</style>
+    </div>
   );
 }
 
-function Input({
+function KpiRow({
   label,
   value,
-  onChange,
-  type = "text",
 }: {
   label: string;
   value: string;
-  onChange: (value: string) => void;
-  type?: string;
+}) {
+  return (
+    <div className="grid grid-cols-2 items-center px-4 py-2.5 text-xs">
+      <span className="text-text-muted">
+        {label}
+      </span>
+
+      <span className="text-right font-mono font-medium">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
 }) {
   return (
     <label className="block">
@@ -376,12 +544,23 @@ function Input({
         {label}
       </span>
 
-      <input
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
-      />
+      {children}
     </label>
   );
+}
+
+function formatDate(dateString: string) {
+  if (!dateString) return "—";
+
+  const date = new Date(`${dateString}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return dateString;
+  }
+
+  return date.toLocaleDateString("th-TH", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
 }
