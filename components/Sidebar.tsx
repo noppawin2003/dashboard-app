@@ -13,6 +13,7 @@ import {
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Overview", icon: LayoutGrid },
   { href: "/dashboard/modules", label: "Modules", icon: Boxes },
+  { href: "/dashboard/data-sheet", label: "Data Sheet", icon: Radio },
   { href: "/dashboard/users", label: "Users", icon: Users },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
