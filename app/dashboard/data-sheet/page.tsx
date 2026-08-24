@@ -33,6 +33,7 @@ export default function DataSheetPage() {
   async function loadReports() {
     try {
       setLoading(true);
+
       const response = await fetch(
         "/api/data-sheet?campaign=U25",
         {
@@ -277,7 +278,7 @@ export default function DataSheetPage() {
                   <div className="p-2">
                     <div className="mx-auto w-full overflow-hidden rounded-md border border-border">
                       {/* U Header */}
-                      <div className="border-b border-border bg-surface-2 px-3 py-2 text-center">
+                      <div className="border-b border-border bg-surface-2 px-2 py-1.5 text-center">
                         <span className="font-display text-xs font-semibold">
                           U25
                         </span>
@@ -312,17 +313,12 @@ export default function DataSheetPage() {
 
                         <KpiRow
                           label="order"
-                          value={formatNumber(
-                            report.orders,
-                            0
-                          )}
+                          value={formatNumber(report.orders, 0)}
                         />
 
                         <KpiRow
                           label="เฉลี่ยบิล"
-                          value={formatNumber(
-                            kpi.averageBill
-                          )}
+                          value={formatNumber(kpi.averageBill)}
                         />
                       </div>
                     </div>
@@ -518,7 +514,7 @@ function KpiRow({
   value: string;
 }) {
   return (
-    <div className="grid grid-cols-2 items-center px-3 py-2 text-xs">
+    <div className="grid grid-cols-2 items-center px-2 py-1.5 text-xs">
       <span className="text-text-muted">
         {label}
       </span>
